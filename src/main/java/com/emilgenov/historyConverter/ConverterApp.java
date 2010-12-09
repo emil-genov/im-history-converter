@@ -3,10 +3,11 @@ package com.emilgenov.historyConverter;
 import com.emilgenov.historyConverter.api.BackEnd;
 import com.emilgenov.historyConverter.api.FrontEnd;
 import com.emilgenov.historyConverter.api.model.History;
+import com.emilgenov.historyConverter.config.Configurator;
+import com.emilgenov.historyConverter.config.ConsoleConfigurator;
+import com.emilgenov.historyConverter.config.PropertiesConfigurator;
 
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.Properties;
 
 /**
  * User: Emil Genov
@@ -19,16 +20,16 @@ public class ConverterApp {
     private static final String BACK_END_CONFIG = "back-end";
 
     public static void main(String args[]) throws IOException {
-        String configFile = "config.properties";
+        Configurator tConfigurator;
         if (args.length == 1) {
-            configFile = args[0];
+            tConfigurator = new PropertiesConfigurator(args[0]);
+        } else {
+            tConfigurator = new ConsoleConfigurator();
         }
-        final Properties tProperties = new Properties();
-        tProperties.load(new FileInputStream(configFile));
 
         FrontEnd tEnd;
         try {
-            tEnd = instantiateFrontEnd(tProperties);
+            tEnd = instantiateFrontEnd(tConfigurator);
         } catch (Exception e) {
             System.err.println("Problem instantiating front end.");
             e.printStackTrace();
@@ -46,7 +47,7 @@ public class ConverterApp {
 
         BackEnd tBackEnd;
         try {
-            tBackEnd = instantiateBackEnd(tProperties);
+            tBackEnd = instantiateBackEnd(tConfigurator);
         } catch (Exception e) {
             System.err.println("Problem instantiating back end.");
             e.printStackTrace();
@@ -61,17 +62,17 @@ public class ConverterApp {
         }
     }
 
-    private static FrontEnd instantiateFrontEnd(final Properties pProperties) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
-        final Class<FrontEnd> tClass = (Class<FrontEnd>) Class.forName(pProperties.getProperty(FRONT_END_CONFIG));
+    private static FrontEnd instantiateFrontEnd(final Configurator pConfigurator) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+        final Class<FrontEnd> tClass = (Class<FrontEnd>) Class.forName(pConfigurator.getConfigValue(FRONT_END_CONFIG));
         final FrontEnd tEnd = tClass.newInstance();
-        tEnd.setConfiguration(pProperties);
+        tEnd.setConfigurator(pConfigurator);
         return tEnd;
     }
 
-    private static BackEnd instantiateBackEnd(final Properties pProperties) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
-        final Class<BackEnd> tClass = (Class<BackEnd>) Class.forName(pProperties.getProperty(BACK_END_CONFIG));
+    private static BackEnd instantiateBackEnd(final Configurator pConfigurator) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+        final Class<BackEnd> tClass = (Class<BackEnd>) Class.forName(pConfigurator.getConfigValue(BACK_END_CONFIG));
         final BackEnd tEnd = tClass.newInstance();
-        tEnd.setConfiguration(pProperties);
+        tEnd.setConfigurator(pConfigurator);
         return tEnd;
     }
 }

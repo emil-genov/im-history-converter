@@ -5,6 +5,7 @@ import com.emilgenov.historyConverter.api.model.Account;
 import com.emilgenov.historyConverter.api.model.History;
 import com.emilgenov.historyConverter.api.model.HistoryItem;
 import com.emilgenov.historyConverter.api.model.User;
+import com.emilgenov.historyConverter.config.Configurator;
 import com.emilgenov.historyConverter.util.Util;
 import org.jdom.Document;
 import org.jdom.Element;
@@ -36,6 +37,10 @@ public class PurpleFrontEnd implements FrontEnd {
     private Map<String, User> stringUserMap = new HashMap<String, User>();
     private String[] paths;
 
+    public void setConfigurator(final Configurator pConfigurator) {
+        final String tPaths = pConfigurator.getConfigValue(PATH_CONFIG);
+        paths = tPaths.split(";");
+    }
 
     public void setConfiguration(final Properties pConfiguration) {
         final String tPaths = pConfiguration.getProperty(PATH_CONFIG);
