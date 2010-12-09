@@ -4,6 +4,7 @@ import com.emilgenov.historyConverter.api.BackEnd;
 import com.emilgenov.historyConverter.api.model.Account;
 import com.emilgenov.historyConverter.api.model.History;
 import com.emilgenov.historyConverter.api.model.HistoryItem;
+import com.emilgenov.historyConverter.config.Configurator;
 import com.emilgenov.historyConverter.util.Util;
 
 import javax.activation.DataHandler;
@@ -20,6 +21,8 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -28,21 +31,35 @@ import java.util.Properties;
  * Time: 20:56:10
  */
 public class GmailBackEnd implements BackEnd {
-    private Properties configuration;
     private final static String GMAIL_USERNAME = "gmail.username";
     private final static String GMAIL_PASSWORD = "gmail.password";
     private final static String GMAIL_LABEL = "gmail.label";
-    private final static String GMAIL_ACCOUNT_NAME = "gmail.accountName.";
-    private final static String CONVERT_ADDRESS = "gmail.convertAddresses.";
     private final static String SUBJECT_PATTERN = "gmail.history-item.pattern";
+    private final static String DATE_PATTERN = "gmail.history-item.date-pattern";
+
     private SimpleDateFormat simpleDateFormat;
+    private Configurator configurator;
+    private String gmailUserName;
+    private String gmailPassword;
+    private String gmailLabel;
+    private String subjectPattern;
+    private String datePattern;
+
+    public void setConfigurator(final Configurator pConfigurator) {
+        configurator = pConfigurator;
+        gmailUserName = configurator.getConfigValue(GMAIL_USERNAME);
+        gmailPassword = configurator.getConfigValue(GMAIL_PASSWORD);
+        gmailLabel = configurator.getConfigValue(GMAIL_LABEL);
+        subjectPattern = configurator.getConfigValue(SUBJECT_PATTERN);
+        datePattern = configurator.getConfigValue(DATE_PATTERN);
+    }
 
     public void useHistory(final History pHistory) throws Exception {
-        String tLabel = configuration.getProperty(GMAIL_LABEL);
+        readAccountData(pHistory);
         Session tSession = createSession();
         Store tImapStore = getImapStore(tSession);
         for (Account tAccount : pHistory.getAccounts()) {
-            String tFolderName = tLabel + "/" + getAccountName(tAccount);
+            String tFolderName = gmailLabel + "/" + getAccountName(tAccount);
             Folder tFolder = openChatsFolder(tImapStore, tFolderName);
             for (HistoryItem tItem : pHistory.getHistoryItems(tAccount)) {
                 System.out.println("Processing message " + tItem.getUser().getName() + ":" + getDateFormatted(tItem.getDate()));
@@ -53,16 +70,20 @@ public class GmailBackEnd implements BackEnd {
         }
     }
 
-    private String getAccountName(Account tAccount) {
-        if (configuration.getProperty(GMAIL_ACCOUNT_NAME + tAccount.getId()) != null) {
-            return configuration.getProperty(GMAIL_ACCOUNT_NAME + tAccount.getId());
-        } else {
-            return tAccount.getId();
+    private Map<Account, String> accountNameMap;
+    private Map<Account, Boolean> convertEmailMap;
+
+    private void readAccountData(final History pHistory) {
+        accountNameMap = new HashMap<Account, String>();
+        convertEmailMap = new HashMap<Account, Boolean>();
+        for (Account tAccount : pHistory.getAccounts()) {
+            accountNameMap.put(tAccount, configurator.getAccountName(tAccount.getId()));
+            convertEmailMap.put(tAccount, configurator.isConvertMailAddressesForAccount(tAccount.getId()));
         }
     }
 
-    public void setConfiguration(final Properties pConfiguration) {
-        configuration = pConfiguration;
+    private String getAccountName(Account tAccount) {
+        return accountNameMap.get(tAccount);
     }
 
     private Session createSession() {
@@ -72,10 +93,8 @@ public class GmailBackEnd implements BackEnd {
     }
 
     private Store getImapStore(Session pSession) throws MessagingException {
-        String tUserName = configuration.getProperty(GMAIL_USERNAME);
-        String tPassword = configuration.getProperty(GMAIL_PASSWORD);
         Store tStore = pSession.getStore("imaps");
-        tStore.connect("imap.gmail.com", tUserName, tPassword);
+        tStore.connect("imap.gmail.com", gmailUserName, gmailPassword);
         return tStore;
     }
 
@@ -91,12 +110,12 @@ public class GmailBackEnd implements BackEnd {
     private Message createMessage(HistoryItem pHistoryItem, Session pSession) throws MessagingException, IOException {
         Message tMimeMessage = new MimeMessage(pSession);
         String tFrom = pHistoryItem.getUser().getIdentifier();
-        if ("true".equals(configuration.getProperty(CONVERT_ADDRESS + pHistoryItem.getUser().getAccount().getId()))) {
+        if (convertEmailMap.get(pHistoryItem.getUser().getAccount())) {
             tFrom = Util.convertFromCyrillic(removeSpaces(pHistoryItem.getUser().getName()) + "@" + getAccountName(pHistoryItem.getUser().getAccount()));
         }
 
         tMimeMessage.setFrom(new InternetAddress(tFrom, pHistoryItem.getUser().getName(), "UTF-8"));
-        tMimeMessage.setRecipients(Message.RecipientType.TO, InternetAddress.parse(configuration.getProperty(GMAIL_USERNAME) + "@gmail.com", false));
+        tMimeMessage.setRecipients(Message.RecipientType.TO, InternetAddress.parse(gmailUserName + "@gmail.com", false));
         tMimeMessage.setSubject(getSubject(pHistoryItem));
         tMimeMessage.setDataHandler(new DataHandler(new ByteArrayDataSource(pHistoryItem.getText(), "text/html")));
         tMimeMessage.setHeader("X-Mailer", "Chat History Converter");
@@ -105,14 +124,12 @@ public class GmailBackEnd implements BackEnd {
     }
 
     private String getSubject(final HistoryItem pHistoryItem) {
-        String tSubjectPattern = configuration.getProperty(SUBJECT_PATTERN);
-        return MessageFormat.format(tSubjectPattern, pHistoryItem.getUser().getName(), getDateFormatted(pHistoryItem.getDate()));
+        return MessageFormat.format(subjectPattern, pHistoryItem.getUser().getName(), getDateFormatted(pHistoryItem.getDate()));
     }
 
     private String getDateFormatted(final Date pDate) {
         if (simpleDateFormat == null) {
-            String tDatePattern = configuration.getProperty("gmail.history-item.date-pattern");
-            simpleDateFormat = new SimpleDateFormat(tDatePattern);
+            simpleDateFormat = new SimpleDateFormat(datePattern);
         }
         return simpleDateFormat.format(pDate);
     }

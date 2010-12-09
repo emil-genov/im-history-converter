@@ -1,6 +1,6 @@
 package com.emilgenov.historyConverter.api;
 
-import java.util.Properties;
+import com.emilgenov.historyConverter.config.Configurator;
 
 /**
  * User: Emil Genov
@@ -8,5 +8,5 @@ import java.util.Properties;
  * Time: 12:53:05
  */
 public interface Configurable {
-    void setConfiguration(Properties pConfiguration);
+    void setConfigurator(Configurator pConfigurator);
 }
